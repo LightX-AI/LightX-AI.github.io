@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta content="Light-X" name="title" />
+  <meta content="This paper aims to address the challenge of generating 4D video rendering with camera and illumination control." name="description" />
+  <meta content="Computer Vision, Controllable Video Generation, Video Relighting, Joint Camera-Illumination Control" name="keywords" />
+  <meta content="index, follow" name="robots" />
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+  <meta content="English" name="language" />
+  <meta content="Tianqi Liu" name="author" />
+  <title>Light-X: Generative 4D Video Rendering with Camera and Illumination Control</title>
+  <!-- Bootstrap -->
+  <script src="js/video_comparison.js"></script>
+  <script src="js/jquery-3.4.1.min.js"></script>
+  <script src="js/bootstrap-4.4.1.js"></script>
+  <script src="js/app.js"></script>
+
+  <link href="css/bootstrap-4.4.1.css" rel="stylesheet" />
+  
+  <link href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/brands.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/solid.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/fontawesome.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;700;800;900&amp;display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/katex@0.13.18/dist/katex.min.css" rel="stylesheet" />
+  <link href="assets/imgs/favicon.jpg" rel="icon" sizes="any" type="image/svg+xml" />
+
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.13.18/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.13.18/dist/contrib/auto-render.min.js"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <meta http-equiv="origin-trial"
+        content="AnCVEgj/n1Wom/TQTyNlRdgaqJ7Jl6rABJAERKq1NA46LD//axzLbfaj1/g7oMoYhDH645hH9huq1C1qWx1uoQwAAAB0eyJvcmlnaW4iOiJodHRwczovL2ZyZWU0ZC5naXRodWIuaW86NDQzIiwiZmVhdHVyZSI6IldlYkdQVVN1Ymdyb3Vwc0ZlYXR1cmVzIiwiZXhwaXJ5IjoxNzQ0NzYxNTk5LCJpc1N1YmRvbWFpbiI6dHJ1ZX0=" />
+    <link rel="icon" href="favicon.ico">
+  <script type="module">
+    // import init, * as bindings from '/brush-demo/brush-desktop-cfe413afb3e2c900.js';
+    import init, * as bindings from '/brush-demo/brush_app.js';
+    const isWebGPUSupported = 'gpu' in navigator;
+    const warningElement = document.getElementById('webgpu-warning');
+    const canvasElement = document.getElementById('brush_canvas');
+
+    const originalFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function () {
+        if (!this.matches('[id="brush_canvas"]')) {
+            originalFocus.apply(this, arguments);
+        }
+    };
+
+    if (isWebGPUSupported) {
+        // const wasm = await init({ module_or_path: '/brush-demo/brush-desktop-cfe413afb3e2c900_bg.wasm' });
+        const wasm = await init({ module_or_path: '/brush-demo/brush_app_bg.wasm' });
+        window.wasmBindings = bindings;
+        dispatchEvent(new CustomEvent("TrunkApplicationStarted", { detail: { wasm } }));
+    } else {
+        warningElement.style.display = 'block';
+        canvasElement.style.display = 'none';
+    }
+  </script>
+
+
+  <style>
+    code {
+      white-space: pre-wrap;
+    }
+
+    body {
+      font-family: 'Jost';
+      font-weight: 500;
+      font-size: 1.25em;
+    }
+
+    h1 {
+      font-size: 2.25em;
+    }
+
+    h2 {
+      font-size: 1.75em;
+    }
+
+    h3 {
+      font-size: 1.5em;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      font-weight: bolder;
+    }
+
+    b {
+      font-weight: bolder;
+    }
+
+    strong {
+      font-weight: bold;
+    }
+
+    section>h5 {
+      padding-bottom: 30px;
+    }
+
+    .col-12>h3 {
+      padding-top: 30px;
+    }
+
+    .results-section {
+      padding-bottom: 30px;
+    }
+
+    .carousel-control-prev,
+    .carousel-control-next {
+      background-color: rgba(0, 0, 0, 0.5);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .carousel-control-prev {
+      left: 25px;
+    }
+
+    .carousel-control-next {
+      right: 25px;
+    }
+
+    .carousel-indicators {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      bottom: 10%;
+      left: 90%;
+
+      /* Adjust vertical position */
+      text-align: center;
+      /* Center the content horizontally */
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .carousel-indicators li {
+      background-color: transparent;
+      /* Hide the default Bootstrap indicators */
+      border: none;
+      /* Remove border */
+      margin: 0 25px;
+      display: inline-block;
+    }
+
+    .indicator-dot {
+      display: inline-block;
+      width: 15px;
+      height: 15px;
+      text-indent: -999px;
+      border: none;
+      border-radius: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .row.sm-gutters {
+      margin-right: 5px;
+      margin-left: 5px;
+      margin-top: 5px;
+      margin-bottom: 5px;
+    }
+
+    .row.sm-gutters>.col-md-4 {
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+
+    .row.sm-gutters>.col-md-6 {
+      padding-right: 5px;
+      padding-left: 5px;
+      padding-top: 5px;
+      padding-bottom: 5px;
+    }
+
+    .row.sm-gutters>.col-md-12 {
+      padding-top: 5px;
+      padding-bottom: 5px;
+      padding-right: 5px;
+      padding-left: 5px;
+    }
+
+    .zoom-element {
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .zoom-element:hover {
+      transform: scale(1.25);
+    }
+
+    video,
+    iframe {
+      border-radius: 10px;
+      padding: 0px;
+      margin: 0px;
+    }
+
+    .comparison-canvas {
+      border-radius: 10px;
+      padding: 0px;
+      margin: 0px;
+    }
+
+    .a16x9 {
+      aspect-ratio: 16/9;
+    }
+
+    .a4x3 {
+      aspect-ratio: 4/3;
+    }
+
+    .a1x1 {
+      aspect-ratio: 1;
+    }
+
+    .a085 {
+      aspect-ratio: 1430/1678;
+    }
+
+    .a133 {
+      aspect-ratio: 1352/1014;
+    }
+
+    .a1875 {
+      aspect-ratio: 1920/1024;
+    }
+    .text-box {
+      display: inline-block;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 10px; 
+      border-radius: 5px;
+      font-size: 16px;
+      color: #333;
+      text-align: center;
+      line-height: 1.5;
+      box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+    }
+    .thumbnail-img {
+      border: 2px solid #ccc;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      border-radius: 5px;
+    }
+    .custom-link {
+      color: inherit;
+      text-decoration: none;
+    }
+    .custom-link:hover {
+        text-decoration: underline;
+    }
+  </style>
+  <script>
+
+  </script>
+  </link>
+</head>
+
+<body>
+  <!-- cover -->
+  <section>
+    <div class="jumbotron text-center mt-0">
+      <div class="container">
+        <div class="row">
+          <div class="col-12">
+            <h1 style="font-weight: bold">
+              <b>
+                <span style="
+                    font-weight: 800;
+                    background: linear-gradient(90deg, #4cd4c9 0%, #4d7bdd 50%, #7f66e6 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                ">
+                  Light-X
+                </span>:
+                <span style="color: #4d7bdd;">
+                  Generative 4D Video Rendering
+                </span>
+                with
+                <span style="color: #53c8be;">
+                  Camera
+                </span>
+                and
+                <span style="color: #7c69c7;">
+                  Illumination
+                </span>
+                Control
+              </b>
+            </h1>
+            <hr>
+            <a href="http://tqtqliu.github.io/" target="_blank">Tianqi Liu<sup>1,2</sup></a>&nbsp;&nbsp;
+            <a href="https://frozenburning.github.io/" target="_blank">Zhaoxi Chen<sup>2</sup></a>&nbsp;&nbsp;
+            <a href="https://inso-13.github.io/" target="_blank">Zihao Huang<sup>1,2</sup></a>&nbsp;&nbsp;
+            <a href="https://daniellli.github.io/" target="_blank">Shaocong Xu<sup>3</sup></a>&nbsp;&nbsp;
+            <a href="https://sainingzhang.github.io/" target="_blank">Saining Zhang<sup>2</sup></a>&nbsp;&nbsp;<br/>
+            <a href="https://hugoycj.github.io/" target="_blank">Chongjie Ye<sup>1,2</sup></a>&nbsp;&nbsp;
+            <a href="https://arlo0o.github.io/libohan.github.io/" target="_blank">Bohan Li<sup>1,2</sup></a>&nbsp;&nbsp;
+            <a href="https://scholar.google.com/citations?user=396o2BAAAAAJ&hl=en" target="_blank">Zhiguo Cao<sup>1</sup></a>&nbsp;&nbsp;
+            <a href="https://weivision.github.io/" target="_blank">Wei Li<sup>2</sup></a>&nbsp;&nbsp;
+            <a href="https://sites.google.com/view/fromandto" target="_blank">Hao Zhao<sup>2</sup><sup>*</sup></a>&nbsp;&nbsp;
+            <a href="https://liuziwei7.github.io/" target="_blank">Ziwei Liu<sup>2</sup><sup>*</sup>
+            </a>
+            <p>
+              <sup>1</sup>xxx&nbsp;&nbsp;&nbsp;&nbsp;
+              <sup>2</sup>xxx&nbsp;&nbsp;&nbsp;&nbsp;
+              <!-- <br /> -->
+              <sup>3</sup>xxx
+              <!-- &nbsp;&nbsp;&nbsp;&nbsp;<sup>4</sup>Microsoft Research Asia -->
+              <!-- <br />
+              <span style="color: #5a6268;">
+                <sup>*</sup>Corresponding Authors
+              </span> -->
+            </p>
+            <div class="row justify-content-center">
+              <!-- <div class="column">
+                <p class="mb-5">
+                  <a class="btn btn-large btn-light" href="" role="button" target="_blank">
+                    <i class="fa fa-file-pdf-o"></i>
+                    <b>Paper</b>
+                  </a>
+                </p>
+              </div> -->
+              <div class="column">
+                <p class="mb-5">
+                  <a class="btn btn-large btn-light" href="https://arxiv.org/" role="button" target="_blank">
+                    <i class="ai ai-arxiv"></i>
+                    <b>arXiv</b>
+                  </a>
+                </p>
+              </div>
+
+              <div class="column">
+                <p class="mb-5">
+                  <a class="btn btn-large btn-light" href="https://youtu.be/ui9Lg2H--0c" role="button" target="_blank">
+                    <i class="fa fa-youtube-play"></i>
+                    <b>YouTube</b>
+                  </a>
+                </p>
+              </div>
+
+              <div class="column">
+                <p class="mb-5">
+                  <a class="btn btn-large btn-light" href="https://github.com/TQTQliu/Light-X" role="button" target="_blank">
+                    <i class="fa fa-github"></i>
+                    <b>Code</b>
+                  </a>
+                </p>
+              </div>
+
+              <div class="column">
+                <p class="mb-5">
+                  <a class="btn btn-large btn-light" href="assets/bib.txt" role="button" target="_blank">
+                    <i class="fa fa-quote-left"></i>
+                    <b>Cite</b>
+                  </a>
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>TL;DR</h1>
+          <hr style="margin-top: 0px" />
+          <h5>Light-X is a video generation framework that jointly controls camera trajectory and illumination from monocular videos.</h5>
+          <br>
+          <!-- Teaser -->
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/teaser.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Overview Video</h1>
+          <hr style="margin-top: 0px" />
+            <div class="embed-responsive embed-responsive-16by9">
+              <iframe width="100%" height=640 src="https://youtube.com/embed/ui9Lg2H--0c" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+            </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Camera-Illumination Control</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/Camera-Illumination-Control.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Diverse Camera Trajectories</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/Diverse-Camera-Trajectories.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Text-Conditioned Video Relighting</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/Text-Conditioned-Video-Relighting.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Various Lighting Conditions</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/Various-Lighting-Conditions.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Application in Embodied AI</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/Embodied-AI.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Application in Autonomous Driving</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/Autonomous-Driving.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Abstract</h1>
+          <hr style="margin-top: 0px" />
+          <img src="assets/imgs/teaser.jpg" width="100%" />
+          <p style="text-align: justify; text-justify: inter-word;">
+            Recent advances in illumination control extend image-based methods to video, yet still facing a trade-off between lighting fidelity and temporal consistency.
+            Moving beyond relighting, a key step toward generative modeling of real-world scenes is the joint control of camera trajectory and illumination, since visual dynamics are inherently shaped by both geometry and lighting.
+            To this end, we present <b>Light-X</b>, a video generation framework that enables controllable rendering from monocular videos with both viewpoint and illumination control.
+            <b>1)</b> We propose a disentangled design that decouples geometry and lighting signals: geometry and motion are captured via dynamic point clouds projected along user-defined camera trajectories, while illumination cues are provided by a relit frame consistently projected into the same geometry.
+            These explicit, fine-grained cues enable effective disentanglement and guide high-quality illumination.
+            <b>2)</b> To address the lack of paired multi-view and multi-illumination videos, we introduce <b>Light-Syn</b>, a degradation-based pipeline with inverse-mapping that synthesizes training pairs from in-the-wild monocular footage.
+            This strategy yields a dataset covering static, dynamic, and AI-generated scenes, ensuring robust training.
+            Extensive experiments show that <b>Light-X</b> outperforms baseline methods in joint camera-illumination control. 
+            Besides, our model surpasses prior video relighting methods in text- and background-conditioned settings. Ablation studies further validate the effectiveness of the disentangled formulation and degradation pipeline.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Method</h1>
+        </div>
+        <div class="col-12">
+          <hr style="margin-top: 0px" />
+          <img src="assets/imgs/pipeline.jpg" width="100%" />
+          <p style="text-align: left; text-justify: inter-word;">
+            Overview of <b>Light-X</b>.
+            Given an input video \( \mathbf{V}^s \), we first relight one frame with IC-Light,
+            conditioned on a lighting text prompt, to obtain a sparse relit video
+            \( \hat{\mathbf{V}}^s \).
+            We then estimate depths to construct a dynamic point cloud
+            \( \mathcal{P} \) from \( \mathbf{V}^s \) and a relit point cloud
+            \( \hat{\mathcal{P}} \) from \( \hat{\mathbf{V}}^s \).
+            Both point clouds are projected along a user-specified camera trajectory,
+            producing geometry-aligned renders and masks
+            \( (\mathbf{V}^p, \mathbf{V}^m) \) and \( (\hat{\mathbf{V}}^p, \hat{\mathbf{V}}^m) \).
+            These six cues, together with illumination tokens extracted via a Q-Former,
+            are fed into DiT blocks for conditional denoising.
+            Finally, a VAE decoder reconstructs a high-fidelity video
+            \( \mathbf{V}^t \) faithful to the target trajectory and illumination.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <br><br>
+
+  <section>
+    <div class="container">
+      <div class="row">
+        <div class="col-12 text-center">
+          <h1>Comparisons</h1>
+          <hr style="margin-top: 0px" />
+          <div class="video-container">
+            <video class="video" style="width: 98%; max-width:1200px" autoplay controls muted loop>
+              <source src="assets/videos/comparison.mp4">
+            </video>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+
+  <!-- citing -->
+  <div class="container">
+    <div class="row">
+      <div class="col-md-12 text-center">
+        </br>
+        </br>
+        <h1>Citation</h1>
+      </div>
+      <div class="col-md-12">
+        <hr style="margin-top: 0px" />
+        <pre style="background-color: #e9eeef; padding: 1.5em 1.5em; border-radius: 20px; font-size: 0.75em;">
+<code></code></pre>
+        <hr />
+      </div>
+    </div>
+  </div>
+  <br><br>
+
+<footer class="text-center" style="margin-bottom: 10px">
+  Thanks to <a href="https://zhenx.me/" target="_blank">Zhen Xu</a> and <a href="https://lioryariv.github.io/" target="_blank">Lior Yariv</a> for the website template.
+</footer>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-12 text-center">
+  <div class="widgetContainer" style="width:200px; margin-left: 40%;">
+      <script type="text/javascript" id="clstr_globe" src="//clustrmaps.com/globe.js?d=KImGDdQQyJB8Psq48Jgl67sA3eaVpjIX_zrXSPJPRuY"></script>
+  </div>
+</div>
+</div>
+</div>
+
+</body>
+
+</html>
